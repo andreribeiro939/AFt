@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modelo 3D da AFt - etringita</title>
+<style>
+:root{--bg:#f6f8fb;--card:#fff;--bd:#d9e1ea;--fg:#18212b;--mut:#5b6b7a;--ca:#4caf6a;--al:#b35fa8;--o:#e5534b;--w:#4a9de0;--s:#e8c53a}
+*{box-sizing:border-box} body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+main{max-width:1500px;margin:0 auto;padding:16px}.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px}@media(max-width:980px){.grid{grid-template-columns:1fr}}
+#view{height:min(76vh,760px);min-height:420px;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;touch-action:none;cursor:grab}#view canvas{width:100%;height:100%;display:block}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button,label{font:inherit}button{background:#fff;border:1px solid var(--bd);padding:8px 11px;border-radius:10px;cursor:pointer}label.chk{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--bd);padding:7px 10px;border-radius:10px;color:var(--mut);font-size:13px}
+.leg{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 0;color:var(--mut);font-size:13px}.leg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+#tip{position:fixed;display:none;pointer-events:none;z-index:4;background:#fff;border:1px solid var(--bd);padding:4px 8px;border-radius:8px;font-size:12px;box-shadow:0 8px 18px rgba(0,0,0,.1)}
+small{color:var(--mut)}
+</style></head><body>
+<main>
+<h1>Modelo 3D da AFt (etringita)</h1>
+<p style="margin:0 0 12px;color:var(--mut)">Representação didática da estrutura colunar da etringita, baseada na seção 6.2.1 de Taylor. As colunas contêm Ca, Al, OH e H₂O; os canais contêm SO₄²⁻ e H₂O.</p>
+<div class="grid"><div><div id="view"></div>
+<div class="leg">
+<span><i style="background:var(--ca)"></i>Ca</span><span><i style="background:var(--al)"></i>Al</span><span><i style="background:var(--o)"></i>O (OH / SO₄)</span><span><i style="background:var(--w)"></i>O da H₂O</span><span><i style="background:var(--s)"></i>S</span><span><i style="background:#eef3f7;border:1px solid #9aa6b2"></i>H</span>
+</div>
+<div class="row"><button id="bColumns">Isolar colunas</button><button id="bChannels">Isolar canais</button><button id="bAll">Mostrar tudo</button><button id="bReset">Reiniciar vista</button><button id="bAuto">Pausar rotação</button></div>
+<div class="row" id="toggles"></div>
+</div>
+<div class="card"><h2 style="margin:0 0 8px;font-size:18px">O que o modelo mostra</h2>
+<ul style="margin-top:0;padding-left:18px"><li><b>Colunas AFt</b>: octaedros de Al(OH)₆ conectados a poliedros de Ca, organizados paralelamente ao eixo c.</li><li><b>Canais</b>: espaços entre as colunas contendo <b>SO₄²⁻</b> e <b>H₂O</b>.</li><li><b>Morfologia</b>: a estrutura ajuda a entender por que a etringita forma cristais alongados, semelhantes a agulhas.</li></ul>
+<p><b>Fórmula conceitual</b>: [Ca₃Al(OH)₆·12H₂O]₂·(SO₄)₃·2H₂O</p>
+<small><b>Nota científica:</b> Esta representação tridimensional é esquemática e destinada à compreensão da estrutura da etringita (AFt). As posições atômicas, distâncias e interações são aproximadas; o modelo não constitui uma estrutura cristalográfica determinada ou refinada experimentalmente por difração de raios X.</small>
+</div></div></main><div id="tip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE, host=document.getElementById('view');
+const renderer=new T.WebGLRenderer({antialias:true,alpha:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); host.appendChild(renderer.domElement);
+const scene=new T.Scene(), camera=new T.PerspectiveCamera(38,1,0.1,500); scene.add(new T.AmbientLight(0xffffff,.62)); const d1=new T.DirectionalLight(0xffffff,.95); d1.position.set(18,22,18); scene.add(d1); const d2=new T.DirectionalLight(0xffffff,.35); d2.position.set(-16,-12,5); scene.add(d2);
+const spin=new T.Group(), root=new T.Group(); spin.add(root); scene.add(spin); spin.rotation.x=.38;
+const C={Ca:0x4caf6a,Al:0xb35fa8,O:0xe5534b,W:0x4a9de0,H:0xeef3f7,S:0xe8c53a,bond:0x8994a1};
+const cfg={columnSpacing:10.8,zStep:5.35,nUnits:4,colR:2.35,ohR:1.10,waterR:3.1};
+const centers=[[0,0],[cfg.columnSpacing,0],[cfg.columnSpacing/2,cfg.columnSpacing*Math.sqrt(3)/2]];
+const channel=[cfg.columnSpacing/2, cfg.columnSpacing*Math.sqrt(3)/6];
+const vis={Ca:true,Al:true,OH:true,H:true,H2O:true,SO4:true,bond:true}; let auto=true;
+const V=(x,y,z)=>new T.Vector3(x,z,-y);
+function sph(g,p,r,c,sp,grp){const m=new T.Mesh(new T.SphereGeometry(r,22,16),new T.MeshPhongMaterial({color:c,shininess:70})); m.position.copy(p); m.userData={sp,grp}; g.add(m); return m}
+function cyl(g,p1,p2,r,c,sp,grp){const v=new T.Vector3().subVectors(p2,p1), h=v.length(); if(h<1e-6)return; const m=new T.Mesh(new T.CylinderGeometry(r,r,h,14),new T.MeshPhongMaterial({color:c,shininess:40})); m.position.copy(new T.Vector3().addVectors(p1,p2).multiplyScalar(.5)); m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v.clone().normalize()); m.userData={sp,grp}; g.add(m)}
+function build(){while(root.children.length)root.remove(root.children[0]); const g=new T.Group(); root.add(g);
+  centers.forEach(([cx,cy])=>{for(let k=0;k<cfg.nUnits;k++){const z=k*cfg.zStep; const al=V(cx,cy,z); sph(g,al,.50,C.Al,'Al','column'); const upper=[], lower=[];
+    [0,2*Math.PI/3,4*Math.PI/3].forEach(a=>{const o=V(cx+cfg.ohR*Math.cos(a),cy+cfg.ohR*Math.sin(a),z+.95); upper.push(o); sph(g,o,.34,C.O,'OH','column'); const h=new T.Vector3(o.x,o.y+.55,o.z); sph(g,h,.18,C.H,'H','column'); cyl(g,o,h,.05,0xbec8d2,'bond','column'); cyl(g,al,o,.07,C.bond,'bond','column')});
+    [Math.PI/3,Math.PI,5*Math.PI/3].forEach(a=>{const o=V(cx+cfg.ohR*Math.cos(a),cy+cfg.ohR*Math.sin(a),z-.95); lower.push(o); sph(g,o,.34,C.O,'OH','column'); const h=new T.Vector3(o.x,o.y-.55,o.z); sph(g,h,.18,C.H,'H','column'); cyl(g,o,h,.05,0xbec8d2,'bond','column'); cyl(g,al,o,.07,C.bond,'bond','column')});
+    [[0,+1],[2*Math.PI/3,+1],[4*Math.PI/3,+1],[Math.PI/3,-1],[Math.PI,-1],[5*Math.PI/3,-1]].forEach(([a,sgn])=>{const ca=V(cx+cfg.colR*Math.cos(a),cy+cfg.colR*Math.sin(a),z+0.55*sgn); sph(g,ca,.70,C.Ca,'Ca','column'); (sgn>0?upper:lower).forEach(o=>{if(ca.distanceTo(o)<2.7)cyl(g,ca,o,.075,C.bond,'bond','column')}); const w=V(cx+cfg.waterR*Math.cos(a),cy+cfg.waterR*Math.sin(a),z+0.55*sgn); sph(g,w,.40,C.W,'H2O','column'); cyl(g,ca,w,.08,0x6d7e8e,'bond','column'); const h1=new T.Vector3(w.x+.42,w.y+.42,w.z), h2=new T.Vector3(w.x-.22,w.y-.42,w.z+.35); sph(g,h1,.18,C.H,'H','column'); sph(g,h2,.18,C.H,'H','column'); cyl(g,w,h1,.05,0xbec8d2,'bond','column'); cyl(g,w,h2,.05,0xbec8d2,'bond','column')});
+  }});
+  for(let k=0;k<cfg.nUnits-1;k++){const z=k*cfg.zStep+cfg.zStep/2; const s=V(channel[0],channel[1],z); sph(g,s,.56,C.S,'SO4','channel'); [[0,0,1.10],[1.02,0,-.35],[-.51,.88,-.35],[-.51,-.88,-.35]].forEach(q=>{const o=V(channel[0]+q[0],channel[1]+q[1],z+q[2]); sph(g,o,.34,C.O,'SO4','channel'); cyl(g,s,o,.06,C.S,'bond','channel')}); [[1.6,0,1.2],[-1.2,.7,-1.0]].forEach(q=>{const w=V(channel[0]+q[0],channel[1]+q[1],z+q[2]); sph(g,w,.40,C.W,'H2O','channel'); const h1=new T.Vector3(w.x+.42,w.y+.38,w.z), h2=new T.Vector3(w.x-.22,w.y-.38,w.z+.35); sph(g,h1,.18,C.H,'H','channel'); sph(g,h2,.18,C.H,'H','channel'); cyl(g,w,h1,.05,0xbec8d2,'bond','channel'); cyl(g,w,h2,.05,0xbec8d2,'bond','channel')})}
+  applyVisibility(); camera.position.set(7,9,48); camera.lookAt(6,7,0);
+}
+function applyVisibility(){root.traverse(o=>{const u=o.userData||{}; if(!u.sp)return; if(u.sp==='Ca')o.visible=vis.Ca; else if(u.sp==='Al')o.visible=vis.Al; else if(u.sp==='OH')o.visible=vis.OH; else if(u.sp==='H')o.visible=vis.H; else if(u.sp==='H2O')o.visible=vis.H2O; else if(u.sp==='SO4')o.visible=vis.SO4; else if(u.sp==='bond')o.visible=vis.bond;});}
+function size(){renderer.setSize(host.clientWidth,host.clientHeight); camera.aspect=host.clientWidth/host.clientHeight; camera.updateProjectionMatrix()} addEventListener('resize',size);
+size(); build();
+['Ca','Al','OH','H','H2O','SO4','bond'].forEach(k=>{const l=document.createElement('label'); l.className='chk'; l.innerHTML=`<input type="checkbox" checked> ${k}`; l.firstChild.onchange=e=>{vis[k]=e.target.checked; applyVisibility()}; document.getElementById('toggles').appendChild(l)});
+document.getElementById('bColumns').onclick=()=>{root.traverse(o=>{if(!o.userData||!o.userData.grp)return; o.visible=o.userData.grp==='column' && ((o.userData.sp==='Ca'&&vis.Ca)||(o.userData.sp==='Al'&&vis.Al)||(o.userData.sp==='OH'&&vis.OH)||(o.userData.sp==='H'&&vis.H)||(o.userData.sp==='H2O'&&vis.H2O)||(o.userData.sp==='bond'&&vis.bond));})};
+document.getElementById('bChannels').onclick=()=>{root.traverse(o=>{if(!o.userData||!o.userData.grp)return; o.visible=o.userData.grp==='channel' && ((o.userData.sp==='SO4'&&vis.SO4)||(o.userData.sp==='H2O'&&vis.H2O)||(o.userData.sp==='H'&&vis.H)||(o.userData.sp==='bond'&&vis.bond));})};
+document.getElementById('bAll').onclick=()=>applyVisibility();
+document.getElementById('bReset').onclick=()=>{spin.rotation.set(.38,0,0); camera.position.set(7,9,48); camera.lookAt(6,7,0)};
+document.getElementById('bAuto').onclick=e=>{auto=!auto; e.target.textContent=auto?'Pausar rotação':'Girar automaticamente'};
+let drag=null,lastDist=0; const cv=renderer.domElement; cv.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY]; cv.setPointerCapture(e.pointerId)}); cv.addEventListener('pointerup',()=>drag=null); cv.addEventListener('pointermove',e=>{if(!drag)return; spin.rotation.y+=(e.clientX-drag[0])*.01; spin.rotation.x=Math.max(-1.45,Math.min(1.45,spin.rotation.x+(e.clientY-drag[1])*.01)); drag=[e.clientX,e.clientY]}); cv.addEventListener('wheel',e=>{e.preventDefault(); const f=e.deltaY>0?1.06:.94; camera.position.multiplyScalar(f)}, {passive:false});
+const ray=new T.Raycaster(), mv=new T.Vector2(), tip=document.getElementById('tip'), labels={Ca:'Ca',Al:'Al',OH:'O do OH',H:'H',H2O:'O da H₂O',SO4:'SO₄²⁻'};
+cv.addEventListener('pointermove',e=>{if(drag){tip.style.display='none'; return;} const r=cv.getBoundingClientRect(); mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1); ray.setFromCamera(mv,camera); const hit=ray.intersectObjects(root.children,true).find(i=>i.object.isMesh&&i.object.visible&&i.object.userData.sp&&i.object.userData.sp!=='bond'); if(!hit){tip.style.display='none'; return;} tip.textContent=labels[hit.object.userData.sp]||hit.object.userData.sp; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.display='block'}); cv.addEventListener('pointerleave',()=>tip.style.display='none');
+(function loop(){requestAnimationFrame(loop); if(auto)spin.rotation.y+=.004; renderer.render(scene,camera)})();
+</script></body></html>
